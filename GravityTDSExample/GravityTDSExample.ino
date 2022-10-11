@@ -1,20 +1,4 @@
-/***************************************************
- DFRobot Gravity: Analog TDS Sensor/Meter
- <https://www.dfrobot.com/wiki/index.php/Gravity:_Analog_TDS_Sensor_/_Meter_For_Arduino_SKU:_SEN0244>
-
- ***************************************************
- This sample code shows how to read the tds value and calibrate it with the standard buffer solution.
- 707ppm(1413us/cm)@25^c standard buffer solution is recommended.
-
- Created 2018-1-3
- By Jason <jason.ling@dfrobot.com@dfrobot.com>
-
- GNU Lesser General Public License.
- See <http://www.gnu.org/licenses/> for details.
- All above must be included in any redistribution.
- ****************************************************/
-
- /***********Notice and Trouble shooting***************
+/***********Notice and Trouble shooting***************
  1. This code is tested on Arduino Uno with Arduino IDE 1.0.5 r2 and 1.8.2.
  2. Calibration CMD:
      enter -> enter the calibration mode
@@ -25,7 +9,8 @@
 #include <EEPROM.h>
 #include "GravityTDS.h"
 
-#define TdsSensorPin A1
+#define phSens A1
+#define tdsSens A2
 GravityTDS gravityTds;
 
 #define phPower 2
@@ -33,12 +18,16 @@ GravityTDS gravityTds;
 #define tdsGround 4
 #define tdsPower 5
 
+int tds[10],ph[10],temp;
 float temperature = 25,tdsValue = 0;
+unsigned long int tdsAvgValue;
+unsigned long int phAvgValue;
 
 void setup()
 {
   Serial.begin(115200);
-  gravityTds.setPin(TdsSensorPin);
+  Serial.println('Ready');
+  gravityTds.setPin(tdsSens);
   gravityTds.setAref(5.0);  //reference voltage on ADC, default 5.0V on Arduino UNO
   gravityTds.setAdcRange(1024);  //1024 for 10bit ADC;4096 for 12bit ADC
   gravityTds.begin();  //initialization
@@ -53,11 +42,37 @@ void loop()
   digitalWrite(tdsPower, HIGH);
   digitalWrite(tdsGround, HIGH);
   delay(1000);
-  gravityTds.setTemperature(temperature);  // set the temperature and execute temperature compensation
-  gravityTds.update();  //sample and calculate
-  tdsValue = gravityTds.getTdsValue();  // then get the value
-  Serial.print(tdsValue,0);
-  Serial.println("ppm");
+  for(int i=0;i<10;i++)       //Get 10 sample value from the sensor for smooth the value
+  {
+    tds[i]=analogRead(tdsSens);
+    delay(100);
+  }
+  for(int i=0;i<9;i++)        //sort the analog from small to large
+  {
+    for(int j=i+1;j<10;j++)
+    {
+      if(tds[i]>tds[j])
+      {
+        temp=tds[i];
+        tds[i]=tds[j];
+        tds[j]=temp;
+      }
+    }
+  }
+  avgValue=0;
+  for(int i=2;i<8;i++)
+  {
+    avgValue+=tds[i];
+  }
+  float tdsValue=(float)avgValue*5.0/1024/6; //6 at end is for average
+  tdsValue=tdsValue*3.5;
+  Serial.print(tdsValue, 2)
+  Serial.println(" ppm")
+  // gravityTds.setTemperature(temperature);  // set the temperature and execute temperature compensation
+  // gravityTds.update();  //sample and calculate
+  // tdsValue = gravityTds.getTdsValue();  // then get the value
+  // Serial.print(tdsValue,0);
+  // Serial.println("ppm");
   delay(500);
   digitalWrite(tdsPower, LOW);
   digitalWrite(tdsGround, LOW);
@@ -66,6 +81,32 @@ void loop()
   digitalWrite(phGround, HIGH);
   delay(1000);
   //  TODO: ADD PH SENSOR CODE HERE
+  for(int i=0;i<10;i++)       //Get 10 sample value from the sensor for smooth the value
+  {
+    ph[i]=analogRead(phSens);
+    delay(100);
+  }
+  for(int i=0;i<9;i++)        //sort the analog from small to large
+  {
+    for(int j=i+1;j<10;j++)
+    {
+      if(ph[i]>ph[j])
+      {
+        temp=ph[i];
+        ph[i]=ph[j];
+        ph[j]=temp;
+      }
+    }
+  }
+  avgValue=0;
+  for(int i=2;i<8;i++)
+  {
+    avgValue+=ph[i];
+  }
+  float phValue=(float)avgValue*5.0/1024/6; //6 at end is for average
+  phValue=phValue*3.5;
+  Serial.print(phValue, 2)
+  Serial.print(" ph")
   delay(500);
   digitalWrite(phPower, LOW);
   digitalWrite(phGround, LOW);
